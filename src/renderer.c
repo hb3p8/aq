@@ -11,7 +11,7 @@ static GLfloat  vert_buf[BUFFER_SIZE *  8];
 static GLubyte color_buf[BUFFER_SIZE * 16];
 static GLuint  index_buf[BUFFER_SIZE *  6];
 
-static int scale  = 1.0;
+static int scale  = 2.0;
 static int width  = 800;
 static int height = 600;
 static int buf_idx;
@@ -23,7 +23,7 @@ void r_init(const char *title) {
   /* init SDL window */
   window = SDL_CreateWindow(
     title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-    width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    width, height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED);
   SDL_GL_CreateContext(window);
 
   /* init gl */

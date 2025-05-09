@@ -1,6 +1,6 @@
 #include <SDL2/SDL.h>
 #include <setjmp.h>
-#include <unistd.h>
+//#include <unistd.h>
 #include "dsp/dsp.h"
 #include "midi.h"
 #include "app.h"
