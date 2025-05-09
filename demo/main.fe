@@ -142,6 +142,15 @@
         (dsp:set osc-freq 'in2 (+ 30 (* (pow freq 3) 400)))
         (dsp:set noise-amp 'in2 namp)
       )
+      'state                     ; -------- NEW ----------
+        (list                    ; return a flat list of knob values
+          gain adecay freq oenv odecay namp reverb delay)
+
+      'restore (do               ; arg1 is that list → set vars
+        (= gain   (nth 0 arg1))  (= adecay (nth 1 arg1))
+        (= freq   (nth 2 arg1))  (= oenv   (nth 3 arg1))
+        (= odecay (nth 4 arg1))  (= namp   (nth 5 arg1))
+        (= reverb (nth 6 arg1))  (= delay  (nth 7 arg1)))
     )
   )
 )
@@ -219,6 +228,15 @@
           (+ base-cc 3) (= fenv   val)
         )
       )
+      'state                     ; -------- NEW ----------
+        (list                    ; return a flat list of knob values
+          gain adecay cutoff res fdecay fenv reverb delay)
+
+      'restore (do               ; arg1 is that list → set vars
+        (= gain   (nth 0 arg1))  (= adecay (nth 1 arg1))
+        (= cutoff (nth 2 arg1))  (= res    (nth 3 arg1))
+        (= fdecay (nth 4 arg1))  (= fenv   (nth 5 arg1))
+        (= reverb (nth 6 arg1))  (= delay  (nth 7 arg1)))
     )
   )
 )
@@ -270,8 +288,8 @@
 
 (func render-pattern-set (id set hotkeys)
   (ui:with-id (string "set" id)
-    (let ptn-pair (nthcdr (car set) set))
-    (let ptn (car ptn-pair))
+    (let ptncdr (nthcdr (car set) set))
+    (let ptn (car ptncdr))
     (ui:row '(18 268 14 14) 83)
     ;; pattern selectors
     (ui:column
@@ -293,10 +311,10 @@
     (ui:column
       (ui:row '(-1) 40)
       (when (and (ui:button "+") (< (len ptn) 16))
-        (setcar ptn-pair (concat ptn (list nil)))
+        (grow-pattern ptn)
       )
       (when (and (ui:button "-") (< 1 (len ptn)))
-        (setcar ptn-pair (take (- (len ptn) 1) ptn))
+        (shrink-pattern ptn)
       )
     )
     ;; copy / paste / clear
@@ -306,16 +324,28 @@
         (= copied-pattern (concat ptn))
       )
       (when (and (ui:button "P") copied-pattern) ; paste
-        (setcar ptn-pair (concat copied-pattern))
+        (setcar ptncdr (concat copied-pattern))
       )
       (when (ui:button "X") ; clear
-        (setcar ptn-pair (map (fn ()) ptn))
+        (setcar ptncdr (map (fn ()) ptn))
       )
     )
     ; spacing
     (ui:row '(-1) 10)
     (ui:label "")
   )
+)
+
+
+(func grow-pattern (ptn)
+  (while (cdr ptn) (zap ptn cdr))
+  (setcdr ptn (cons nil nil))
+)
+
+
+(func shrink-pattern (ptn)
+  (while (cdr (cdr ptn)) (zap ptn cdr))
+  (setcdr ptn nil)
 )
 
 
@@ -388,23 +418,55 @@
 (= voice5 (make-drum "Drum3"))
 (= voice6 (make-drum "Drum4"))
 
+;; -------------------------------------------------------------------
+;; saving & loading  (seq + 6 voice-states)
+;; -------------------------------------------------------------------
+(func pack-save ()
+  (list seq
+        (voice1 'state) (voice2 'state) (voice3 'state)
+        (voice4 'state) (voice5 'state) (voice6 'state)))
+
+(func unpack-save (d)
+  (= seq (nth 0 d))
+  (voice1 'restore (nth 1 d))  (voice2 'restore (nth 2 d))
+  (voice3 'restore (nth 3 d))  (voice4 'restore (nth 4 d))
+  (voice5 'restore (nth 5 d))  (voice6 'restore (nth 6 d)))
+
+
 (zap outputs rev)
 (= pattern-hotkeys '((1 Q A Z) (2 W S X) (3 E D C) (4 R F V) (5 T G B) (6 Y H N)))
 
 (func on-frame ()
+  (when (is frame-count 0)
+    (let initial-state (read "save1"))
+    (when initial-state (unpack-save initial-state))
+  )
+
+  (for i (range 8)
+    (++ i)
+    (when (ui:key-pressed (string "f" i))
+      (let d (read (string "save" i)))
+      (when d (unpack-save d))
+    )
+  )
+
   (ui:row '(326 18 0))
 
   (ui:column
-    (let i 0)
-    (let hk pattern-hotkeys)
-    (for set seq
+    (let i   0)
+    (let hk  pattern-hotkeys)   ; pointer that we mutate with `zap`
+    (let xs  seq)               ; local cursor into the pattern-set list
+    (while (and xs (< i 4))     ; stop when we showed three columns
+      (let set (car xs))        ; current pattern-set
       (render-pattern-set i set (car hk))
       (++ i)
-      (zap hk cdr)
+      (zap hk cdr)              ; advance hotkey-list
+      (zap xs cdr)              ; advance seq-list
     )
     (ui:row '(-1))
     (render-note-select)
   )
+
   (ui:label "")
 
   (ui:column
@@ -413,22 +475,25 @@
       (ui:row '(-1))
       (voice1 'render)
       (voice3 'render)
-      (voice5 'render)
-      (render-master-reverb)
+      ; (voice5 'render)
+      ; (render-master-reverb)
       (ui:row '(-1) 20)
       (render-master)
       (if
         loading (do
           (let n (number-select "Load..." 8))
           (when n
-            (= seq (or (read (string "save" n)) seq))
+            ; (= seq (or (read (string "save" n)) seq))
+            (let d (read (string "save" n)))
+            (when d (unpack-save d))
             (= loading nil)
           )
         )
         saving (do
           (let n (number-select "Save..." 8))
           (when n
-            (write (string "save" n) seq)
+            ; (write (string "save" n) seq)
+            (write (string "save" n) (pack-save))
             (= saving nil)
           )
         )
@@ -449,8 +514,8 @@
       (ui:row '(-1))
       (voice2 'render)
       (voice4 'render)
-      (voice6 'render)
-      (render-master-delay)
+      ; (voice6 'render)
+      ; (render-master-delay)
       (ui:row '(87 87 -1) 54)
       (for output outputs (ui:scope output 'out))
     )
@@ -472,9 +537,42 @@
 
 
 (func on-midi (type chan arg1 arg2)
-  ; (echo "midi : " type " [" chan "] " arg1 ", " arg2)
+  (echo "midi : " type " [" chan "] " arg1 ", " arg2)
+  (when (is type 'note-on)
+    (when (is chan 0)
+      (voice1 'trigger arg1 arg2)
+    )
+    (when (is chan 1)
+      (voice2 'trigger arg1 arg2)
+    )
+  )
   (when (is type 'cc)
     (voice1 'cc arg1 arg2)
     (voice2 'cc arg1 arg2)
   )
 )
+
+
+; TODO
+; - Common cutoff for all voices controlled with joystick
+; - Better touch controls (emulate mouse down on touch, tweak slider control for better precision)
+; - Send aq fe commands from orca?
+; - Control aq progression with fe script?
+; - Drive one of voice params from key value for drums (eg open/closed hi hat)
+; - Look at more complex synths with 2 oscillators and stuff
+; - Sampled voices? Increase / configure voice count and types?
+; - Drum machines?
+; - Replicate some basses from c&c ost
+
+
+
+
+
+
+
+
+
+
+
+
+
