@@ -2,34 +2,45 @@
 (do-file "ui.fe")
 (do-file "dsp.fe")
 
-
+;; ────────────────────────────────────────────────────────────────────
 ;; master
 (do
   (= outputs nil)
   (= bpm 120)
+
+  ;; ➊  audio hardware
   (= dac (dsp:new 'dac))
 
-  (= master (dsp:new 'math))
-  (dsp:link master 'out dac 'left)
-  (dsp:link master 'out dac 'right)
+  ;; ➋  master bus ----------------------------------------------------
+  (= master      (dsp:new 'math))    ; sum of all voices
 
+  ;; ── NEW: single-pole state-variable filter that will do the cut-off
+  (= master-lp   (dsp:new 'svf))
+  (dsp:send master-lp "mode lowpass")
+
+  ;; signal flow:  voices → master → master-lp → dac
+  (dsp:link master    'out master-lp 'in)
+  (dsp:link master-lp 'out dac       'left)
+  (dsp:link master-lp 'out dac       'right)
+
+  ;; ➌  send/return effects ------------------------------------------
   (= pre-reverb (dsp:new 'math))
-  (= reverb (dsp:new 'reverb))
+  (= reverb     (dsp:new 'reverb))
   (dsp:link pre-reverb 'out reverb 'left)
   (dsp:link pre-reverb 'out reverb 'right)
-  (dsp:link reverb 'left dac 'left)
-  (dsp:link reverb 'right dac 'right)
+  (dsp:link reverb 'left  master 'in)
+  (dsp:link reverb 'right master 'in)
 
-  (= delay (dsp:new 'delay))
+  (= delay      (dsp:new 'delay))
   (= delay-freq-lp (dsp:new 'svf))
   (dsp:link delay-freq-lp 'out delay 'time)
-  (dsp:link delay 'out dac 'left)
-  (dsp:link delay 'out dac 'right)
+  (dsp:link delay         'out master 'in)
   (dsp:send delay-freq-lp "mode lowpass")
   (dsp:set delay-freq-lp 'freq 2)
 
+  ;; ➊  delay UI variables
   (let delay-time 3)
-  (let feedback 0.6)
+  (let feedback   0.6)
 
   (func render-master-delay ()
     (ui:row '(40 -1))
@@ -39,16 +50,15 @@
     (for i (range 6)
       (++ i)
       (if (ui:button i) (= delay-time i))
-      (if (is i delay-time) (ui:selected))
-    )
+      (if (is i delay-time) (ui:selected)))
     (ui:row '(-1))
     (ui:slider3 feedback)
     (ui:row '(-1) 12)
     (ui:label "")
     (dsp:set delay 'feedback feedback)
-    (dsp:set delay-freq-lp 'in (* (bpm-to-seconds bpm) delay-time))
-  )
+    (dsp:set delay-freq-lp 'in (* (bpm-to-seconds bpm) delay-time)))
 
+  ;; ➋  reverb UI variables
   (let size  0.9)
   (let damp  0.5)
   (let width 1.0)
@@ -62,19 +72,36 @@
     (ui:slider3 width)
     (ui:label "")
     (dsp:send reverb (string "roomsize " size))
-    (dsp:send reverb (string "damp " damp))
-    (dsp:send reverb (string "width " width))
-  )
+    (dsp:send reverb (string "damp "     damp))
+    (dsp:send reverb (string "width "    width)))
 
+  ;; ──────────────────────────────────────────────────────────────────
+  ;; ➍  NEW: global cut-off variable (0 … 1) and helper
+  (let cutoff 1.0)                       ; start wide open
+
+  ;; map normalised slider position → frequency (20 Hz … 20 kHz)
+  (func cutoff->hz (x)
+    (+ 20 (* (pow x 4) 19980)))          ; 4-th power gives finer low range
+
+  ;; ➎  master section ------------------------------------------------
   (func render-master ()
     (ui:row '(40 -1))
     (ui:label "Master") (ui:meter (abs (dsp:get master 'out)))
+
+    ;; bpm
     (ui:row '(46 -1))
     (ui:label "bpm:") (= bpm (ui:number "bpm" bpm))
+
+    ;; ── NEW: cut-off slider
+    (ui:row '(46 -1))
+    (ui:label "cut:") (= cutoff (ui:slider "cutoff" cutoff 0 1))
+
     (ui:row '(-1) 8)
     (ui:label "")
+
+    ;; send parameters every frame
     (dsp:set-tick (bpm-to-seconds bpm))
-  )
+    (dsp:set master-lp 'freq (cutoff->hz cutoff)))
 )
 
 
@@ -602,7 +629,6 @@
 ; - Better touch controls (emulate mouse down on touch, tweak slider control for better precision)
 ; - Send aq fe commands from orca?
 ; - Control aq progression with fe script?
-; - Drive one of voice params from key value for drums (eg open/closed hi hat)
 ; - Look at more complex synths with 2 oscillators and stuff
 ; - Sampled voices? Increase / configure voice count and types?
 ; - Drum machines?
