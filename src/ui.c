@@ -94,6 +94,22 @@ void ui_begin_frame(mu_Context *ctx) {
       case SDL_MOUSEWHEEL: mu_input_scroll(ctx, 0, e.wheel.y * -30); break;
       case SDL_TEXTINPUT: mu_input_text(ctx, e.text.text); break;
 
+      case SDL_FINGERDOWN:
+      case SDL_FINGERUP:
+      case SDL_FINGERMOTION:
+      {
+        int w, h;
+        r_get_size(&w, &h);
+        int px = (int)lrintf(e.tfinger.x * w);
+        int py = (int)lrintf(e.tfinger.y * h);
+
+        int b = 1;
+        if (b && e.type == SDL_FINGERDOWN) { mu_input_mousedown(ctx, px, py, b); }
+        if (b && e.type == SDL_FINGERUP) { mu_input_mouseup(ctx, px, py, b); }
+        mu_input_mousemove(ctx, px, py);
+        break;
+      }
+
       case SDL_MOUSEBUTTONDOWN:
       case SDL_MOUSEBUTTONUP: {
         int b = button_map[e.button.button & 0xff];

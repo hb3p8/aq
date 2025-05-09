@@ -651,7 +651,7 @@ void mu_update_control(mu_Context *ctx, mu_Id id, mu_Rect rect, int opt) {
 
   if (ctx->focus == id) { ctx->updated_focus = 1; }
   if (opt & MU_OPT_NOINTERACT) { return; }
-  if (mouseover && !ctx->mouse_down) { ctx->hover = id; }
+  if (mouseover /*&& !ctx->mouse_down*/) { ctx->hover = id; }
 
   if (ctx->focus == id) {
     if (ctx->mouse_pressed && !mouseover) { mu_set_focus(ctx, 0); }
