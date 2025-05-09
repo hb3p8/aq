@@ -108,6 +108,7 @@
   (dsp:chain osc amp master)
   (dsp:chain noise noise-amp amp)
 
+  ;; 8 user parameters (0..1)
   (let gain   0.70)
   (let adecay 0.50)
   (let freq   0.10)
@@ -117,25 +118,56 @@
   (let reverb 0.30)
   (let delay  0.30)
 
+  ;; --- NEW STATE ---------------------------------------------------
+  (let mod-target 'freq)                     ; which param MIDI-note moves
+  (let scale-note (fn (n) (/ n 127)))        ; 0..127 → 0.0..1.0
+  ;; ----------------------------------------------------------------
+
+  ;; Public interface  ------------------------------------------------
   (fn (cmd arg1 arg2)
     (case cmd
+      ;; --------------------------------------------------------------
+      ;; Change which parameter the note number should feed
+      ;; e.g.  ('map-note 'odecay)
+      'map-note (do
+        (when (has arg1 '(gain adecay freq oenv odecay namp reverb delay))
+          (= mod-target arg1)))
+
+      ;; --------------------------------------------------------------
+      ;; Main voice trigger
       'trigger (do
+        ;; 1.  Use the MIDI note to modulate the chosen parameter
+        (let note-val (scale-note (or arg1 0)))
+        (case mod-target
+          'gain   (= gain   note-val)
+          'adecay (= adecay note-val)
+          'freq   (= freq   note-val)
+          'oenv   (= oenv   note-val)
+          'odecay (= odecay note-val)
+          'namp   (= namp   note-val)
+          'reverb (= reverb note-val)
+          'delay  (= delay  note-val))
+
+        ;; 2.  Rest of the original trigger behaviour
         (let g (* gain (if arg2 1.3 1)))
-        (dsp:send amp-env (string "begin " g " 0.005 0 " (* (pow adecay 4) 8)))
-        (dsp:send osc-env (string "begin " oenv " 0.005 0 " (* (pow odecay 4) 8)))
+        (dsp:send amp-env
+          (string "begin " g " 0.005 0 " (* (pow adecay 4) 8)))
+        (dsp:send osc-env
+          (string "begin " oenv " 0.005 0 " (* (pow odecay 4) 8)))
       )
+
       'render (ui:with-id name
         (ui:row '(40 -1))
         (ui:label name) (ui:meter (dsp:get amp-env 'out))
         (ui:row '(130 -1))
-        (ui:slider3 gain)
-        (ui:slider3 adecay)
-        (ui:slider3 freq)
-        (ui:slider3 oenv)
-        (ui:slider3 odecay)
-        (ui:slider3 namp)
-        (ui:slider3 reverb)
-        (ui:slider3 delay)
+        (ui:slider4 gain mod-target)
+        (ui:slider4 adecay mod-target)
+        (ui:slider4 freq mod-target)
+        (ui:slider4 oenv mod-target)
+        (ui:slider4 odecay mod-target)
+        (ui:slider4 namp mod-target)
+        (ui:slider4 reverb mod-target)
+        (ui:slider4 delay mod-target)
         (ui:label "")
         (dsp:set reverb-send 'in2 reverb)
         (dsp:set delay-send 'in2 delay)
@@ -144,13 +176,25 @@
       )
       'state                     ; -------- NEW ----------
         (list                    ; return a flat list of knob values
-          gain adecay freq oenv odecay namp reverb delay)
+          (string mod-target) gain adecay freq oenv odecay namp reverb delay)
 
       'restore (do               ; arg1 is that list → set vars
-        (= gain   (nth 0 arg1))  (= adecay (nth 1 arg1))
-        (= freq   (nth 2 arg1))  (= oenv   (nth 3 arg1))
-        (= odecay (nth 4 arg1))  (= namp   (nth 5 arg1))
-        (= reverb (nth 6 arg1))  (= delay  (nth 7 arg1)))
+        (let mod-target-str (nth 0 arg1))
+        (case mod-target-str
+          "gain"   (= mod-target 'gain)
+          "adecay" (= mod-target 'adecay)
+          "freq"   (= mod-target 'freq)
+          "oenv"   (= mod-target 'oenv)
+          "odecay" (= mod-target 'odecay)
+          "namp"   (= mod-target 'namp)
+          "reverb" (= mod-target 'reverb)
+          "delay"  (= mod-target 'delay)
+          nil
+        )
+        (= gain   (nth 1 arg1))  (= adecay (nth 2 arg1))
+        (= freq   (nth 3 arg1))  (= oenv   (nth 4 arg1))
+        (= odecay (nth 5 arg1))  (= namp   (nth 6 arg1))
+        (= reverb (nth 7 arg1))  (= delay  (nth 8 arg1)))
     )
   )
 )

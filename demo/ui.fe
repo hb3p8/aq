@@ -36,6 +36,21 @@
   ))
 )
 
+(macro ui:slider4 (sym mod-target)
+  (cons 'do (list
+    '(ui:begin-column)
+    '(ui:row '(40 6 -1))
+    (list 'ui:label (string sym))
+    (list 'if (list 'ui:unlabeled-button (string sym "mode"))
+      (list '= mod-target (list 'quote sym))
+    )
+    (list 'if (list 'is (list 'quote sym) mod-target)
+      '(ui:highlight)
+    )
+    (cons 'ui:slider2 (cons sym ()))
+    '(ui:end-column)
+  ))
+)
 
 (func ui:unlabeled-button (id)
   (let res nil)
