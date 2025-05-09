@@ -7,6 +7,7 @@
 (do
   (= outputs nil)
   (= bpm 120)
+  (= gcutoff 1.0)
 
   ;; ➊  audio hardware
   (= dac (dsp:new 'dac))
@@ -75,10 +76,6 @@
     (dsp:send reverb (string "damp "     damp))
     (dsp:send reverb (string "width "    width)))
 
-  ;; ──────────────────────────────────────────────────────────────────
-  ;; ➍  NEW: global cut-off variable (0 … 1) and helper
-  (let cutoff 1.0)                       ; start wide open
-
   ;; map normalised slider position → frequency (20 Hz … 20 kHz)
   (func cutoff->hz (x)
     (+ 20 (* (pow x 4) 19980)))          ; 4-th power gives finer low range
@@ -94,14 +91,14 @@
 
     ;; ── NEW: cut-off slider
     (ui:row '(46 -1))
-    (ui:label "cut:") (= cutoff (ui:slider "cutoff" cutoff 0 1))
+    (ui:label "cut:") (= gcutoff (ui:slider "cutoff" gcutoff 0 1))
 
     (ui:row '(-1) 8)
     (ui:label "")
 
     ;; send parameters every frame
     (dsp:set-tick (bpm-to-seconds bpm))
-    (dsp:set master-lp 'freq (cutoff->hz cutoff)))
+    (dsp:set master-lp 'freq (cutoff->hz gcutoff)))
 )
 
 

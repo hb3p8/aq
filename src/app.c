@@ -35,6 +35,8 @@ static void midi_callback(MidiMessage msg) {
 
 static mu_Container console_win;
 
+SDL_GameController* PAD = NULL;
+
 
 void app_init(int argc, char **argv) {
   if (argc > 1) { expect( chdir(argv[1]) == 0 ); }
@@ -44,7 +46,14 @@ void app_init(int argc, char **argv) {
   SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
   SDL_SetHint(SDL_HINT_WINDOWS_DPI_SCALING, "0");
 #endif
+  SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+  SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+
   SDL_Init(SDL_INIT_EVERYTHING);
+
+  for (int i = 0; i < SDL_NumJoysticks(); ++i)
+    if (!PAD && SDL_IsGameController(i))
+      PAD = SDL_GameControllerOpen(i);
 
   app.fe_lock = SDL_CreateMutex();
 
@@ -142,10 +151,21 @@ static void console_window(mu_Context *ctx) {
   }
 }
 
-
 static void process_frame(mu_Context *ctx) {
   static mu_Container win;
   const int opt = MU_OPT_NOTITLE | MU_OPT_NOFRAME | MU_OPT_AUTOSIZE;
+
+  if (PAD != NULL)
+  {
+    float ry = SDL_GameControllerGetAxis (PAD, SDL_CONTROLLER_AXIS_RIGHTY) / 32768.f;
+    float cutoff = fmaxf(0.25f, 1.f - fmaxf(fabsf(ry) - 0.1f, 0.f) / 0.9f);
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "(= gcutoff %f)", cutoff);
+    app_fe_push();
+    app_do_string(buf);
+    app_fe_pop();
+  }
 
   if (mu_begin_window_ex(app.mu_ctx, &win, "Main", opt)) {
     app_fe_push();
