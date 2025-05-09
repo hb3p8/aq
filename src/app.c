@@ -39,10 +39,13 @@ static mu_Container console_win;
 void app_init(int argc, char **argv) {
   if (argc > 1) { expect( chdir(argv[1]) == 0 ); }
 
-  SDL_Init(SDL_INIT_EVERYTHING);
 #if _WIN32
   SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
+  SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+  SDL_SetHint(SDL_HINT_WINDOWS_DPI_SCALING, "0");
 #endif
+  SDL_Init(SDL_INIT_EVERYTHING);
+
   app.fe_lock = SDL_CreateMutex();
 
   /* init ui */
