@@ -167,6 +167,19 @@ static void process_frame(mu_Context *ctx) {
     app_fe_pop();
   }
 
+  if (PAD != NULL)
+  {
+    float rx = SDL_GameControllerGetAxis(PAD, SDL_CONTROLLER_AXIS_RIGHTX) / 32768.f;
+    float val = fmaxf(fabsf(rx) - 0.1f, 0.f) / 0.9f;
+    val += 0.01f;
+
+    char buf[32];
+    snprintf(buf, sizeof(buf), "(= sat-amount %f)", val);
+    app_fe_push();
+    app_do_string(buf);
+    app_fe_pop();
+  }
+
   if (mu_begin_window_ex(app.mu_ctx, &win, "Main", opt)) {
     app_fe_push();
     app_do_string("(if on-frame (on-frame))");

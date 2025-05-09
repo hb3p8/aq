@@ -24,6 +24,7 @@ Node* new_svf_node(void);
 Node* new_math_node(void);
 Node* new_line_node(void);
 Node* new_shaper_node(void);
+Node* new_waveshaper_node(void);
 Node* new_delay_node(void);
 Node* new_reverb_node(void);
 
@@ -34,6 +35,7 @@ static struct { const char *name; NodeConstructor fn; } node_table[] = {
   { "math",   new_math_node   },
   { "line",   new_line_node   },
   { "shaper", new_shaper_node },
+  { "waveshaper", new_waveshaper_node },
   { "reverb", new_reverb_node },
   { "delay",  new_delay_node  },
   { },

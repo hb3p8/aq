@@ -9,6 +9,10 @@
   (= bpm 120)
   (= gcutoff 1.0)
 
+  (= sat-amount 0.1)            ; 0 … 1
+  (= tilt      0.5)             ; 0 = dark, 1 = bright
+  (= excite    0.0)             ; 0 … 1
+
   ;; ➊  audio hardware
   (= dac (dsp:new 'dac))
 
@@ -19,8 +23,12 @@
   (= master-lp   (dsp:new 'svf))
   (dsp:send master-lp "mode lowpass")
 
+  (= saturator (dsp:new 'waveshaper))
+  (dsp:send saturator "shape tanh")
+
   ;; signal flow:  voices → master → master-lp → dac
-  (dsp:link master    'out master-lp 'in)
+  (dsp:link master    'out saturator 'in)
+  (dsp:link saturator    'out master-lp 'in)
   (dsp:link master-lp 'out dac       'left)
   (dsp:link master-lp 'out dac       'right)
 
@@ -93,12 +101,17 @@
     (ui:row '(46 -1))
     (ui:label "cut:") (= gcutoff (ui:slider "cutoff" gcutoff 0 1))
 
+    (ui:row '(46 -1))
+    (ui:label "sat:") (= sat-amount (ui:slider "sat" sat-amount 0 1))
+
     (ui:row '(-1) 8)
     (ui:label "")
 
     ;; send parameters every frame
     (dsp:set-tick (bpm-to-seconds bpm))
-    (dsp:set master-lp 'freq (cutoff->hz gcutoff)))
+    (dsp:set master-lp 'freq (cutoff->hz gcutoff))
+    (dsp:set saturator 'gain (* 10 sat-amount))
+  )
 )
 
 
@@ -622,7 +635,6 @@
 
 
 ; TODO
-; - Common cutoff for all voices controlled with joystick
 ; - Better touch controls (emulate mouse down on touch, tweak slider control for better precision)
 ; - Send aq fe commands from orca?
 ; - Control aq progression with fe script?
