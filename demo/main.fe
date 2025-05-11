@@ -635,12 +635,13 @@
 
 
 ; TODO
-; - Better touch controls (emulate mouse down on touch, tweak slider control for better precision)
+; - Upload to github
+; - Refactor joystic controls (poll from fe script)
 ; - Send aq fe commands from orca?
 ; - Control aq progression with fe script?
+; - Drum machines?
 ; - Look at more complex synths with 2 oscillators and stuff
 ; - Sampled voices? Increase / configure voice count and types?
-; - Drum machines?
 ; - Replicate some basses from c&c ost
 
 
