@@ -1,4 +1,11 @@
 #include <SDL2/SDL.h>
+
+#define _WINSOCK_DEPRECATED_NO_WARNINGS  /* for inet_ntoa */
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <stdio.h>
+
+#pragma comment(lib, "ws2_32.lib")
 #include <setjmp.h>
 //#include <unistd.h>
 #include "dsp/dsp.h"
@@ -37,6 +44,7 @@ static mu_Container console_win;
 
 SDL_GameController* PAD = NULL;
 
+SOCKET sock;
 
 void app_init(int argc, char **argv) {
   if (argc > 1) { expect( chdir(argv[1]) == 0 ); }
@@ -98,9 +106,43 @@ void app_init(int argc, char **argv) {
   app_fe_push();
   app_do_file("main.fe");
   app_fe_pop();
+
+  /* 1. Initialize Winsock ---------------------------------------------- */
+  WSADATA wsa;
+  if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
+    fprintf(stderr, "WSAStartup failed (%d)\n", WSAGetLastError());
+    return 1;
+  }
+
+  /* 2. Create UDP socket ------------------------------------------------- */
+  sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (sock == INVALID_SOCKET) {
+    fprintf(stderr, "socket() failed (%d)\n", WSAGetLastError());
+    WSACleanup();
+    return 1;
+  }
+
+  /* 3. Bind to 0.0.0.0:49200 -------------------------------------------- */
+  struct sockaddr_in local = { 0 };
+  local.sin_family = AF_INET;
+  local.sin_addr.s_addr = htonl(INADDR_ANY);   /* listen on all interfaces */
+  local.sin_port = htons(49200);
+
+  if (bind(sock, (struct sockaddr*)&local, sizeof(local)) == SOCKET_ERROR) {
+    fprintf(stderr, "bind() failed (%d)\n", WSAGetLastError());
+    closesocket(sock);
+    WSACleanup();
+    return 1;
+  }
+
+  u_long nb = 1;                     /* 1 = non-blocking, 0 = blocking   */
+  if (ioctlsocket(sock, FIONBIO, &nb) == SOCKET_ERROR) {
+    fprintf(stderr, "ioctlsocket() failed (%d)\n", WSAGetLastError());
+    return;
+  }
+
+  printf("Listening for UDP datagrams on port 49200...\n");
 }
-
-
 
 static void console_window(mu_Context *ctx) {
   /* toggle console */
@@ -185,6 +227,52 @@ static void process_frame(mu_Context *ctx) {
     app_do_string("(if on-frame (on-frame))");
     app_fe_pop();
     mu_end_window(app.mu_ctx);
+  }
+
+  {
+    fd_set r;
+    FD_ZERO(&r);
+    FD_SET(sock, &r);
+
+    struct timeval tv = { 0, 0 };      /* 0-timeout => don't block         */
+    int ready = select(0, &r, NULL, NULL, &tv);
+    if (ready == SOCKET_ERROR) {
+      fprintf(stderr, "select() failed (%d)\n", WSAGetLastError());
+    }
+    else if (ready > 0) {
+      /* socket is readable -> safe to call recvfrom()                    */
+      char buf[2048];
+      struct sockaddr_in from;
+      int fromlen = sizeof(from);
+      int n = recvfrom(sock, buf, sizeof(buf), 0,
+        (struct sockaddr*)&from, &fromlen);
+      if (n == SOCKET_ERROR) {
+        fprintf(stderr, "recvfrom() failed (%d)\n", WSAGetLastError());
+      }
+      else
+      {
+        buf[n] = '\0';
+        //printf("UDP %d bytes | \"%s\"\n",
+        //  n,
+        //  buf);
+
+        char str[128];
+        void* pos = memchr(buf, ':', n);
+        if (pos) {
+
+          char* p = (char*)pos;
+          *p = '\0';
+          sprintf(str, "(if on-udp (on-udp \"%s\" \"%s\"))", buf, p + 1);
+        }
+        else
+        {
+          sprintf(str, "(if on-udp (on-udp \"%s\" \"\"))", buf);
+        }
+        app_fe_push();
+        app_do_string(str);
+        app_fe_pop();
+      }
+    }
   }
 
   int w, h;

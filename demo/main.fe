@@ -633,11 +633,25 @@
   )
 )
 
+(func on-udp (arg1 arg2)
+  (echo "udp : " arg1 ", " arg2)
+
+  (let xs seq) 
+  (let set (car xs))
+
+  (case arg2
+    "1" (setcar set 1)
+    "2" (setcar set 2)
+    "3" (setcar set 3)
+    "4" (setcar set 4)
+    nil
+  )
+)
+
 
 ; TODO
-; - Upload to github
+; - Properly set pattern index and current patern
 ; - Refactor joystic controls (poll from fe script)
-; - Send aq fe commands from orca?
 ; - Control aq progression with fe script?
 ; - Drum machines?
 ; - Look at more complex synths with 2 oscillators and stuff
